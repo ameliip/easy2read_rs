@@ -1,4 +1,4 @@
-const HEADER_LEN:     u32 = 10;
+pub const HEADER_LEN:     u16 = 10;
 const AVP_HEADER_LEN: u16 = 6;
 const VENDOR_ID:      u32 = 0x00005358; // CAEN Vendor ID From Spec
 
@@ -22,18 +22,18 @@ impl TryFrom<u16> for MessageDir {
 }
 
 #[derive(Debug)]
-enum HeaderError {
+pub enum HeaderError {
     TooShort,
     WrongDirection, // Expected RX, found TX
     WrongVendorId,
 }
 
 #[derive(Debug)]
-struct Header {
-    direction: MessageDir,
-    message_id: u16,
-    vendor_id: u32,
-    length: u16,
+pub struct Header {
+    pub direction: MessageDir,
+    pub message_id: u16,
+    pub vendor_id: u32,
+    pub length: u16,
 }
 
 impl Header {
@@ -93,10 +93,10 @@ pub enum AvpError {
 }
 
 pub struct Avp {
-    reserved: u16,
-    length: u16,
-    attr_type: u16,
-    value: Vec<u8>,
+    pub reserved: u16,
+    pub length: u16,
+    pub attr_type: u16,
+    pub value: Vec<u8>,
 }
 
 impl Avp {
@@ -136,26 +136,6 @@ impl TryFrom<&[u8]> for Avp {
 }
 
 pub struct Message {
-    header: Header,
-    avp_list: Vec<Avp>,
-}
-
-#[derive(Debug)]
-pub enum MessageError {
-    TooLong,
-}
-
-impl Message {
-    pub fn new(message_id: u16, avp_list: Vec<Avp>) -> Result<Self, MessageError> {
-        let len: u16 = (avp_list.iter()
-            .map(|avp| avp.length as u32)
-            .sum::<u32>() + HEADER_LEN)
-            .try_into()
-            .map_err(|_| MessageError::TooLong)?;
-
-        Ok(Message {
-            header: Header::new(message_id, len),
-            avp_list,
-        })
-    }
+    pub header: Header,
+    pub avp_list: Vec<Avp>,
 }
