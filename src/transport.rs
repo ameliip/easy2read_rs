@@ -9,8 +9,8 @@ pub enum TransportError {
 }
 
 pub trait Transport {
-    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), TransportError>;
-    fn write_all(&mut self, buf: &mut [u8]) -> Result<(), TransportError>;
+    fn read_exact(&mut self, buf: &mut[u8]) -> Result<(), TransportError>;
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), TransportError>;
 }
 
 pub struct SerialTransport {
@@ -35,7 +35,7 @@ impl Transport for SerialTransport {
         .map_err(|e| TransportError::IoError(e.to_string()))
     }
 
-    fn write_all(&mut self, buf: &mut [u8]) -> Result<(), TransportError> {
+    fn write_all(&mut self, buf: &[u8]) -> Result<(), TransportError> {
         self.port.write_all(buf)
         .map_err(|e| TransportError::IoError(e.to_string()))
     }

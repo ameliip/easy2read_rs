@@ -4,7 +4,7 @@ const VENDOR_ID:      u32 = 0x00005358; // CAEN Vendor ID From Spec
 
 #[repr(u16)]
 #[derive(Debug)]
-enum MessageDir {
+pub enum MessageDir {
     Tx = 0x8001,
     Rx = 0x0001,
 }
@@ -14,8 +14,8 @@ impl TryFrom<u16> for MessageDir {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            0x8001 => Ok(MessageDir::Tx),
-            0x0001 => Ok(MessageDir::Rx),
+            0x8001 => Ok(Self::Tx),
+            0x0001 => Ok(Self::Rx),
             _      => Err(HeaderError::WrongDirection),
         }
     }
@@ -135,7 +135,95 @@ impl TryFrom<&[u8]> for Avp {
 
 }
 
+impl From<&Avp> for Vec<u8> {
+    fn from (avp: &Avp) -> Vec<u8> {
+        let mut bytes: Vec<u8> = Vec::new();
+
+        bytes.extend_from_slice(&(avp.reserved as u16).to_be_bytes());
+        bytes.extend_from_slice(&(avp.length as u16).to_be_bytes());
+        bytes.extend_from_slice(&(avp.attr_type as u16).to_be_bytes());
+        bytes.extend(&avp.value);
+
+        return bytes;
+    } 
+}
+
 pub struct Message {
     pub header: Header,
     pub avp_list: Vec<Avp>,
+}
+
+#[derive(Debug)]
+pub enum MessageError {
+    TooLong,
+    TooShort,
+    Header(HeaderError),
+    Avp(AvpError),
+    InvalidValue,
+}
+
+impl From<HeaderError> for MessageError {
+    fn from(e: HeaderError) -> Self { MessageError::Header(e) }
+}
+
+impl From<AvpError> for MessageError {
+    fn from(e: AvpError) -> Self { MessageError::Avp(e) }
+}
+
+impl Message {
+    pub fn new(message_id: u16, avp_list: Vec<Avp>) -> Result<Self, MessageError> {
+        let len: u16 = (avp_list.iter()
+            .map(|avp| avp.length as u32)
+            .sum::<u32>() + HEADER_LEN as u32)
+            .try_into()
+            .map_err(|_| MessageError::TooLong)?;
+
+        Ok(Message {
+            header: Header::new(message_id, len),
+            avp_list,
+        })
+    }
+}
+
+impl TryFrom<&[u8]> for Message {
+    type Error = MessageError;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        let header = Header::try_from(data).map_err(|e| MessageError::Header(e))?;
+        let mut avp_list: Vec<Avp> = Vec::new();
+        let mut offset: usize = HEADER_LEN as usize;
+
+        if header.length > 0xfff {
+            return Err(Self::Error::TooLong);
+        }
+
+        while offset < header.length as usize {
+            let avp: Avp = Avp::try_from(&data[offset..]).map_err(|e| MessageError::Avp(e))?;
+            offset += avp.length as usize;
+            avp_list.push(avp);            
+        }
+        
+        if avp_list.len() > 0 {
+                Ok(Message {header, avp_list})
+        } else {
+            Err(Self::Error::TooShort)
+        }
+    }
+}
+
+impl From<Message> for Vec<u8> {
+    fn from(message: Message) -> Vec<u8> {
+        let mut bytes: Vec<u8> = Vec::new();
+
+        bytes.extend_from_slice(&(message.header.direction as u16).to_be_bytes());
+        bytes.extend_from_slice(&(message.header.message_id as u16).to_be_bytes());
+        bytes.extend_from_slice(&(message.header.vendor_id as u32).to_be_bytes());
+        bytes.extend_from_slice(&(message.header.length as u16).to_be_bytes());
+        
+        for avp in &message.avp_list {
+            bytes.extend(Vec::<u8>::from(avp));
+        }
+
+        return bytes;
+    }
 }
