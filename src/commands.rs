@@ -128,7 +128,7 @@ impl Easy2ReadClient {
             constants::AVP_COMMAND_NAME, 
             constants::CMD_GET_PROTOCOL.to_be_bytes().to_vec(),
         )?;
-        let message: protocol::Message = protocol::Message::new(
+        let message = protocol::Message::new(
             self.message_id,
             vec![avp_cmd_name]
         )?;
@@ -168,7 +168,7 @@ impl Easy2ReadClient {
             constants::AVP_PROTOCOL,
             (protocol as u32).to_be_bytes().to_vec(),
         )?;
-        let message: protocol::Message = protocol::Message::new(
+        let message = protocol::Message::new(
             self.message_id,
             vec![avp_cmd_name, avp_prot_type]
         )?;
@@ -196,7 +196,7 @@ impl Easy2ReadClient {
             constants::AVP_COMMAND_NAME, 
             constants::CMD_GET_POWER.to_be_bytes().to_vec(),
         )?;
-        let message: protocol::Message = protocol::Message::new(
+        let message = protocol::Message::new(
             self.message_id,
             vec![avp_cmd_name]
         )?;
@@ -230,9 +230,9 @@ impl Easy2ReadClient {
         )?;
         let avp_pow_lvl = protocol::Avp::new(
             constants::AVP_POWER_SET,
-            (power_mw as u32).to_be_bytes().to_vec(),
+            power_mw.to_be_bytes().to_vec(),
         )?;
-        let message: protocol::Message = protocol::Message::new(
+        let message = protocol::Message::new(
             self.message_id,
             vec![avp_cmd_name, avp_pow_lvl]
         )?;
@@ -245,4 +245,680 @@ impl Easy2ReadClient {
         Ok(())
     }
 
+    /// Gets the RF channel currently in use by the reader.
+    ///
+    /// # Returns
+    /// The current RF channel number (0-9, referred to ETSI EN 302 208 regulation)
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// * `CommandError::Message` - If the response does not contain the expected AVP
+    pub fn cmd_get_rf_channel(&mut self) -> Result<u16, CommandError> {
+        // Build Command
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_GET_RF_CHANNEL.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+        
+        self.check_result_code(&response)?;
+
+        // Find protocol avp in response
+        let result_avp = response.avp_list.iter()
+            .find(|avp| avp.attr_type == constants::AVP_RF_CHANNEL)
+            .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
+
+        Ok(u16::from_be_bytes(result_avp.value[0..2].try_into().unwrap()))
+    }
+
+    /// Sets the RF channel for the reader.
+    ///
+    /// # Arguments
+    /// * `channel` - RF channel number (0-9, referred to ETSI EN 302 208 regulation)
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    pub fn cmd_set_rf_channel(&mut self, channel: u16) -> Result<(), CommandError> {
+        // Build Command
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_SET_RF_CHANNEL.to_be_bytes().to_vec(),
+        )?;
+        let avp_channel = protocol::Avp::new(
+            constants::AVP_RF_CHANNEL,
+            channel.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_channel]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+        Ok(())        
+    }
+
+    /// Gets the current Listen Before Talk (LBT) mode setting.
+    /// Only supported on ETSI EN 302 208 compatible readers.
+    ///
+    /// # Returns
+    /// `true` if LBT is enabled, `false` if disabled
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// * `CommandError::Message` - If the response does not contain the expected AVP
+    pub fn cmd_get_lbt_mode(&mut self) -> Result<bool, CommandError> {
+        // Build Command
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_SET_LBT_MODE.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+
+        // Find protocol avp in response
+        let result_avp = response.avp_list.iter()
+            .find(|avp| avp.attr_type == constants::AVP_BOOLEAN)
+            .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
+
+        let status = u16::from_be_bytes(result_avp.value[0..2].try_into().unwrap());
+        Ok(status != 0) // status conversion to bool
+    }
+
+    /// Enables or disables the Listen Before Talk (LBT) capability.
+    /// Only supported on ETSI EN 302 208 compatible readers.
+    ///
+    /// # Arguments
+    /// * `enabled` - `true` to enable LBT, `false` to disable
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    pub fn cmd_set_lbt_mode(&mut self, enabled: bool) -> Result<(), CommandError> {
+        // Build Command
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_SET_LBT_MODE.to_be_bytes().to_vec(),
+        )?;
+        let avp_lbt_mode = protocol::Avp::new(
+            constants::AVP_BOOLEAN,
+            (enabled as u16).to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_lbt_mode]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+        Ok(())
+    }
+
+    /// Gets the RF regulation currently in use by the reader.
+    ///
+    /// # Returns
+    /// The current [`constants::RFRegulation`] in use
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// * `CommandError::Message` - If the response does not contain the expected AVP
+    pub fn cmd_get_rf_regulation(&mut self) -> Result<constants::RFRegulation, CommandError>{
+        // Build Command
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_GET_RF_REGULATION.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+
+        // Find protocol avp in response
+        let result_avp = response.avp_list.iter()
+            .find(|avp| avp.attr_type == constants::AVP_RF_REGULATION)
+            .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
+
+        let regulation_raw = u16::from_be_bytes(result_avp.value[0..2].try_into().unwrap());
+        let regulation = constants::RFRegulation::try_from(regulation_raw)?;
+
+        Ok(regulation)
+    }
+
+    /// Starts or stops the generation of a continuous RF wave.
+    /// Used only for test and measurement purposes.
+    ///
+    /// # Arguments
+    /// * `enabled` - `true` to start the RF wave, `false` to stop it
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    pub fn cmd_rf_on_off(&mut self, enabled: bool) -> Result<(), CommandError> {
+        // Build Command
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_RF_ON_OFF.to_be_bytes().to_vec(),
+        )?;
+        let avp_rf_mode = protocol::Avp::new(
+            constants::AVP_RF_ON_OFF,
+            (enabled as u16).to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_rf_mode]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+        Ok(())
+    }
+
+    /// Gets the firmware revision of the reader.
+    ///
+    /// # Returns
+    /// A `String` containing the firmware revision
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// * `CommandError::Message` - If the response does not contain the expected AVP\
+    pub fn cmd_get_firmware_release(&mut self) -> Result<String, CommandError> {
+        // Build Command
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_GET_FIRMWARE_RELEASE.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+
+        // Find protocol avp in response
+        let result_avp = response.avp_list.iter()
+            .find(|avp| avp.attr_type == constants::AVP_FW_RELEASE)
+            .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
+
+        let mut fwver_raw = result_avp.value.clone();
+        fwver_raw.retain(|&b| b != 0);
+        let fw_release = String::from_utf8(fwver_raw)
+            .map_err(|_| CommandError::Message(protocol::MessageError::InvalidValue))?;
+
+        Ok(fw_release)
+    }
+
+    /// Gets information about the reader (model and serial number).
+    ///
+    /// # Returns
+    /// A `String` in the format `<reader name> <serial number>`
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// * `CommandError::Message` - If the response does not contain the expected AVP
+    pub fn cmd_get_reader_info(&mut self) -> Result<String, CommandError> {
+        // Build Command
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_GET_READER_INFO.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+
+        // Find protocol avp in response
+        let result_avp = response.avp_list.iter()
+            .find(|avp| avp.attr_type == constants::AVP_READER_INFO)
+            .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
+
+        let mut info_raw = result_avp.value.clone();
+        info_raw.retain(|&b| b != 0);
+        let fw_info = String::from_utf8(info_raw)
+            .map_err(|_| CommandError::Message(protocol::MessageError::InvalidValue))?;
+
+        Ok(fw_info)  
+    }
+
+    /// Modifies the serial port settings of the reader.
+    ///
+    /// # Arguments
+    /// * `baud_rate` - Baud rate value
+    /// * `data_bits` - Number of data bits
+    /// * `stop_bits` - Number of stop bits
+    /// * `parity` - Parity setting
+    /// * `flow_ctrl` - Flow control setting
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    pub fn cmd_set_rs232(&mut self, baud_rate: u32, data_bits: u32, stop_bits: u32, parity: constants::Parity, flow_ctlr: constants::FlowCtrl) -> Result<(), CommandError> {
+        // Build Command
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_SET_RS232.to_be_bytes().to_vec(),
+        )?;
+        let avp_baud_rate = protocol::Avp::new(
+            constants::AVP_BAUD_RATE, 
+            baud_rate.to_be_bytes().to_vec(),
+        )?;
+        let avp_data_bits = protocol::Avp::new(
+            constants::AVP_DATA_BITS, 
+            data_bits.to_be_bytes().to_vec(),
+        )?;
+        let avp_stop_bits = protocol::Avp::new(
+            constants::AVP_STOP_BITS, 
+            stop_bits.to_be_bytes().to_vec(),
+        )?;
+        let avp_parity = protocol::Avp::new(
+            constants::AVP_PARITY, 
+            (parity as u32).to_be_bytes().to_vec(),
+        )?;
+        let avp_flow_ctrl = protocol::Avp::new(
+            constants::AVP_FLOW_CTRL, 
+            (flow_ctlr as u32).to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_baud_rate, avp_data_bits, avp_stop_bits, avp_parity, avp_flow_ctrl]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+        Ok(())
+    }
+
+    /// Reads the current status of the I/O lines of the reader.
+    ///
+    /// # Returns
+    /// A `u32` representing the I/O register status.
+    /// Input lines are mapped on the least significant bits,
+    /// output lines on the most significant bits.
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// * `CommandError::Message` - If the response does not contain the expected AVP
+    pub fn cmd_get_io(&mut self) -> Result<u32, CommandError> {
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_GET_IO.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+
+        // Find protocol avp in response
+        let result_avp = response.avp_list.iter()
+            .find(|avp| avp.attr_type == constants::AVP_IO_REGISTER)
+            .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
+
+        Ok(u32::from_be_bytes(result_avp.value[0..4].try_into().unwrap()))
+    }
+
+    /// Sets the level of the output I/O lines of the reader.
+    ///
+    /// # Arguments
+    /// * `io_register` - A `u32` bitmask representing the output lines to set
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    pub fn cmd_set_io(&mut self, io_register: u32) -> Result<(), CommandError> {
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_SET_IO.to_be_bytes().to_vec(),
+        )?;
+        let avp_set_io = protocol::Avp::new(
+            constants::AVP_IO_REGISTER, 
+            io_register.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_set_io],
+        )?;
+        
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+        Ok(())        
+    }
+
+    /// Gets the current direction setting of the I/O lines.
+    ///
+    /// # Returns
+    /// A `u32` bitmask where `0` = input, `1` = output for each bit
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// * `CommandError::Message` - If the response does not contain the expected AVP
+    pub fn cmd_get_io_direction(&mut self) -> Result<u32, CommandError> {
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_GET_IO_DIRECTION.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name]
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+
+        // Find protocol avp in response
+        let result_avp = response.avp_list.iter()
+            .find(|avp| avp.attr_type == constants::AVP_IO_REGISTER)
+            .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
+
+        Ok(u32::from_be_bytes(result_avp.value[0..4].try_into().unwrap()))   
+    }
+
+    /// Sets the direction of the I/O lines (input or output).
+    ///
+    /// # Arguments
+    /// * `io_register` - A `u32` bitmask where `0` = input, `1` = output for each bit
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    pub fn cmd_set_io_direction(&mut self, io_register: u32) -> Result<(), CommandError> {
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_SET_IO_DIRECTION.to_be_bytes().to_vec(),
+        )?;
+        let avp_set_io = protocol::Avp::new(
+            constants::AVP_IO_REGISTER, 
+            io_register.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_set_io],
+        )?;
+        
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+        Ok(())       
+    }
+
+    /// Gets a configuration parameter for a logical source.
+    ///
+    /// # Arguments
+    /// * `source_name` - Name of the source to configure (e.g. "Source_0")
+    /// * `parameter` - The configuration parameter to read
+    ///
+    /// # Returns
+    /// The value of the requested configuration parameter
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// * `CommandError::Message` - If the response does not contain the expected AVP
+    pub fn cmd_get_source_config(&mut self, source_name: &str, param: constants::ConfigParameter) -> Result<u32, CommandError> {
+        let mut term_source_name = source_name.as_bytes().to_vec();
+        term_source_name.push(0); // Null terminator 
+
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_GET_SOURCE_CONFIG.to_be_bytes().to_vec(),
+        )?;
+        let avp_source_name = protocol::Avp::new(
+            constants::AVP_SOURCE_NAME, 
+            term_source_name,
+        )?;
+        let avp_config_param = protocol::Avp::new(
+            constants::AVP_CONFIG_PARAMETER, 
+            (param as u32).to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_source_name, avp_config_param],
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+
+        // Find protocol avp in response
+        let result_avp = response.avp_list.iter()
+            .find(|avp| avp.attr_type == constants::AVP_CONFIG_VALUE)
+            .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
+
+        Ok(u32::from_be_bytes(result_avp.value[0..4].try_into().unwrap()))   
+    }
+
+    /// Sets a configuration parameter for a logical source.
+    ///
+    /// # Arguments
+    /// * `source_name` - Name of the source to configure (e.g. "Source_0")
+    /// * `parameter` - The configuration parameter to set
+    /// * `value` - The value for the parameter
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    pub fn cmd_set_source_config(&mut self, source_name: &str, param: constants::ConfigParameter, value: u32) -> Result<(), CommandError> { 
+        let mut term_source_name = source_name.as_bytes().to_vec();
+        term_source_name.push(0); // Null terminator 
+
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_SET_SOURCE_CONFIG.to_be_bytes().to_vec(),
+        )?;
+        let avp_source_name = protocol::Avp::new(
+            constants::AVP_SOURCE_NAME, 
+            term_source_name,
+        )?;
+        let avp_config_param = protocol::Avp::new(
+            constants::AVP_CONFIG_PARAMETER, 
+            (param as u32).to_be_bytes().to_vec(),
+        )?;
+        let avp_config_value = protocol::Avp::new(
+            constants::AVP_CONFIG_VALUE, 
+            value.to_be_bytes().to_vec(),
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_source_name, avp_config_param, avp_config_value],
+        )?;
+        
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+        Ok(())   
+    }
+
+    /// Checks the quality of the antenna connection for a given read point.
+    ///
+    /// # Arguments
+    /// * `read_point_name` - Name of the read point to check (e.g. "Ant0")
+    ///
+    /// # Returns
+    /// The [`constants::ReadPointStatus`] of the antenna connection
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// * `CommandError::Message` - If the response does not contain the expected AVP
+    pub fn cmd_check_read_point_status(&mut self, read_point_name: &str) -> Result<constants::ReadPointStatus, CommandError> {
+        let mut term_read_point_name = read_point_name.as_bytes().to_vec();
+        term_read_point_name.push(0); // Null terminator 
+        
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_CHECK_READ_POINT_STATUS.to_be_bytes().to_vec(),
+        )?;
+        let avp_read_point_name = protocol::Avp::new(
+            constants::AVP_READ_POINT_NAME, 
+            term_read_point_name,
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_read_point_name],
+        )?;
+        
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+
+        // Find protocol avp in response
+        let result_avp = response.avp_list.iter()
+            .find(|avp| avp.attr_type == constants::AVP_READ_POINT_STATUS)
+            .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
+        
+        let read_point_status = constants::ReadPointStatus::try_from(u32::from_be_bytes(result_avp.value[0..4].try_into().unwrap()))?;
+        Ok(read_point_status)
+    }
+
+    /// Adds a read point (antenna) to a logical source.
+    ///
+    /// # Arguments
+    /// * `source_name` - Name of the source (e.g. "Source_0")
+    /// * `read_point_name` - Name of the read point to add (e.g. "Ant0")
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// 
+    pub fn cmd_add_read_point_to_source(&mut self, source_name: &str, read_point_name: &str) -> Result<(), CommandError> {
+        let mut term_source_name = source_name.as_bytes().to_vec();
+        term_source_name.push(0); // Null terminator 
+
+        let mut term_read_point_name = read_point_name.as_bytes().to_vec();
+        term_read_point_name.push(0); // Null terminator 
+
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_ADD_READ_POINT_TO_SOURCE.to_be_bytes().to_vec(),
+        )?;
+        let avp_source_name = protocol::Avp::new(
+            constants::AVP_SOURCE_NAME, 
+            term_source_name,
+        )?;
+        let avp_read_point_name = protocol::Avp::new(
+            constants::AVP_READ_POINT_NAME, 
+            term_read_point_name,
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_source_name, avp_read_point_name],
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+        Ok(())
+    }
+
+    /// Removes a read point (antenna) from a logical source.
+    ///
+    /// # Arguments
+    /// * `source_name` - Name of the source (e.g. "Source_0")
+    /// * `read_point_name` - Name of the read point to remove (e.g. "Ant0")
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    pub fn cmd_remove_read_point_from_source(&mut self, source_name: &str, read_point_name: &str) -> Result<(), CommandError> {
+        let mut term_source_name = source_name.as_bytes().to_vec();
+        term_source_name.push(0); // Null terminator 
+
+        let mut term_read_point_name = read_point_name.as_bytes().to_vec();
+        term_read_point_name.push(0); // Null terminator 
+
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_REMOVE_READ_POINT_FROM_SOURCE.to_be_bytes().to_vec(),
+        )?;
+        let avp_source_name = protocol::Avp::new(
+            constants::AVP_SOURCE_NAME, 
+            term_source_name,
+        )?;
+        let avp_read_point_name = protocol::Avp::new(
+            constants::AVP_READ_POINT_NAME, 
+            term_read_point_name,
+        )?;
+        let message = protocol::Message::new(
+            self.message_id,
+            vec![avp_cmd_name, avp_source_name, avp_read_point_name],
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+        Ok(())
+    }
 }

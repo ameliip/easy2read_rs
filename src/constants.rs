@@ -187,6 +187,18 @@ pub enum ReadPointStatus {
     Bad  = 0x00000002,
 }
 
+impl TryFrom<u32> for ReadPointStatus {
+    type Error = ConversionError;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0x00000000 => Ok(Self::Good),
+            0x00000001 => Ok(Self::Poor),
+            0x00000002 => Ok(Self::Bad),
+            _ => Err(ConversionError::UnknownValue(value))
+        }
+    }
+}
+
 // ============================================================
 // MemoryBank values (AVP 0x0071)
 // ============================================================
@@ -269,6 +281,28 @@ pub enum RFRegulation {
     Brazil        = 0x000A,
     JapanStdT106  = 0x000B,
     JapanStdT107  = 0x000C,
+}
+
+impl TryFrom<u16> for RFRegulation {
+    type Error = ConversionError;
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match value {
+            0x0000 => Ok(Self::EtsiEn302208),
+            0x0001 => Ok(Self::EtsiEn300220),
+            0x0002 => Ok(Self::Fcc),
+            0x0003 => Ok(Self::Malaysia), 
+            0x0004 => Ok(Self::Japan),
+            0x0005 => Ok(Self::Korea),
+            0x0006 => Ok(Self::Australia),
+            0x0007 => Ok(Self::China),
+            0x0008 => Ok(Self::Taiwan),
+            0x0009 => Ok(Self::Singapore),
+            0x000A => Ok(Self::Brazil),
+            0x000B => Ok(Self::JapanStdT106),
+            0x000C => Ok(Self::JapanStdT107),
+            _ => Err(ConversionError::UnknownValue(value as u32))
+        }
+    }
 }
 
 // ============================================================
