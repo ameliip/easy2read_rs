@@ -113,6 +113,14 @@ impl Easy2ReadClient {
         }
     }
 
+    /// Converts a `&str` to a NULL-terminated `Vec<u8>` as required by the CAEN easy2read protocol.
+    /// All string values in the protocol must end with a `0x00` byte.
+    fn null_terminate(s: &str) -> Vec<u8> {
+        let mut v = s.as_bytes().to_vec();
+        v.push(0);
+        v
+    }
+
     /// Gets the air protocol currently in use by the reader.
     ///
     /// # Returns
@@ -123,7 +131,7 @@ impl Easy2ReadClient {
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP
     pub fn cmd_get_protocol(&mut self) -> Result<constants::Protocol, CommandError> {
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_GET_PROTOCOL.to_be_bytes().to_vec(),
@@ -159,7 +167,7 @@ impl Easy2ReadClient {
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader rejects the command (check [`constants::ResultCode`])
     pub fn cmd_set_protocol(&mut self, protocol: constants::Protocol) -> Result<(), CommandError> {
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_SET_PROTOCOL.to_be_bytes().to_vec(),
@@ -191,7 +199,7 @@ impl Easy2ReadClient {
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP
     pub fn cmd_get_power(&mut self) -> Result<u32, CommandError> {
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_GET_POWER.to_be_bytes().to_vec(),
@@ -223,7 +231,7 @@ impl Easy2ReadClient {
     /// # Errors
     /// Returns `CommandError::ReaderError` if the reader rejects the value
     pub fn cmd_set_power(&mut self, power_mw: u32) -> Result<(), CommandError> {
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_SET_POWER.to_be_bytes().to_vec(),
@@ -255,7 +263,7 @@ impl Easy2ReadClient {
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP
     pub fn cmd_get_rf_channel(&mut self) -> Result<u16, CommandError> {
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_GET_RF_CHANNEL.to_be_bytes().to_vec(),
@@ -288,7 +296,7 @@ impl Easy2ReadClient {
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     pub fn cmd_set_rf_channel(&mut self, channel: u16) -> Result<(), CommandError> {
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_SET_RF_CHANNEL.to_be_bytes().to_vec(),
@@ -321,7 +329,7 @@ impl Easy2ReadClient {
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP
     pub fn cmd_get_lbt_mode(&mut self) -> Result<bool, CommandError> {
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_SET_LBT_MODE.to_be_bytes().to_vec(),
@@ -356,7 +364,7 @@ impl Easy2ReadClient {
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     pub fn cmd_set_lbt_mode(&mut self, enabled: bool) -> Result<(), CommandError> {
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_SET_LBT_MODE.to_be_bytes().to_vec(),
@@ -388,7 +396,7 @@ impl Easy2ReadClient {
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP
     pub fn cmd_get_rf_regulation(&mut self) -> Result<constants::RFRegulation, CommandError>{
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_GET_RF_REGULATION.to_be_bytes().to_vec(),
@@ -425,7 +433,7 @@ impl Easy2ReadClient {
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     pub fn cmd_rf_on_off(&mut self, enabled: bool) -> Result<(), CommandError> {
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_RF_ON_OFF.to_be_bytes().to_vec(),
@@ -457,7 +465,7 @@ impl Easy2ReadClient {
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP\
     pub fn cmd_get_firmware_release(&mut self) -> Result<String, CommandError> {
-        // Build Command
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_GET_FIRMWARE_RELEASE.to_be_bytes().to_vec(),
@@ -496,7 +504,7 @@ impl Easy2ReadClient {
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP
     pub fn cmd_get_reader_info(&mut self) -> Result<String, CommandError> {
-        // Build Command
+  
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_GET_READER_INFO.to_be_bytes().to_vec(),
@@ -537,8 +545,15 @@ impl Easy2ReadClient {
     /// # Errors
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
-    pub fn cmd_set_rs232(&mut self, baud_rate: u32, data_bits: u32, stop_bits: u32, parity: constants::Parity, flow_ctlr: constants::FlowCtrl) -> Result<(), CommandError> {
-        // Build Command
+    pub fn cmd_set_rs232(
+        &mut self, 
+        baud_rate: u32, 
+        data_bits: u32, 
+        stop_bits: u32, 
+        parity: constants::Parity, 
+        flow_ctlr: constants::FlowCtrl
+    ) -> Result<(), CommandError> {
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_SET_RS232.to_be_bytes().to_vec(),
@@ -588,6 +603,7 @@ impl Easy2ReadClient {
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP
     pub fn cmd_get_io(&mut self) -> Result<u32, CommandError> {
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_GET_IO.to_be_bytes().to_vec(),
@@ -620,6 +636,7 @@ impl Easy2ReadClient {
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     pub fn cmd_set_io(&mut self, io_register: u32) -> Result<(), CommandError> {
+
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_SET_IO.to_be_bytes().to_vec(),
@@ -651,6 +668,7 @@ impl Easy2ReadClient {
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP
     pub fn cmd_get_io_direction(&mut self) -> Result<u32, CommandError> {
+    
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_GET_IO_DIRECTION.to_be_bytes().to_vec(),
@@ -683,6 +701,7 @@ impl Easy2ReadClient {
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     pub fn cmd_set_io_direction(&mut self, io_register: u32) -> Result<(), CommandError> {
+    
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
             constants::CMD_SET_IO_DIRECTION.to_be_bytes().to_vec(),
@@ -717,9 +736,8 @@ impl Easy2ReadClient {
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP
-    pub fn cmd_get_source_config(&mut self, source_name: &str, param: constants::ConfigParameter) -> Result<u32, CommandError> {
-        let mut term_source_name = source_name.as_bytes().to_vec();
-        term_source_name.push(0); // Null terminator 
+    pub fn cmd_get_source_config(&mut self, source_name: &str, param: constants::ConfigParameter)
+    -> Result<u32, CommandError> {
 
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
@@ -727,7 +745,7 @@ impl Easy2ReadClient {
         )?;
         let avp_source_name = protocol::Avp::new(
             constants::AVP_SOURCE_NAME, 
-            term_source_name,
+            Self::null_terminate(source_name),
         )?;
         let avp_config_param = protocol::Avp::new(
             constants::AVP_CONFIG_PARAMETER, 
@@ -762,9 +780,12 @@ impl Easy2ReadClient {
     /// # Errors
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
-    pub fn cmd_set_source_config(&mut self, source_name: &str, param: constants::ConfigParameter, value: u32) -> Result<(), CommandError> { 
-        let mut term_source_name = source_name.as_bytes().to_vec();
-        term_source_name.push(0); // Null terminator 
+    pub fn cmd_set_source_config(
+        &mut self, 
+        source_name: &str, 
+        param: constants::ConfigParameter, 
+        value: u32
+    ) -> Result<(), CommandError> { 
 
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
@@ -772,7 +793,7 @@ impl Easy2ReadClient {
         )?;
         let avp_source_name = protocol::Avp::new(
             constants::AVP_SOURCE_NAME, 
-            term_source_name,
+            Self::null_terminate(source_name),
         )?;
         let avp_config_param = protocol::Avp::new(
             constants::AVP_CONFIG_PARAMETER, 
@@ -807,9 +828,8 @@ impl Easy2ReadClient {
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// * `CommandError::Message` - If the response does not contain the expected AVP
-    pub fn cmd_check_read_point_status(&mut self, read_point_name: &str) -> Result<constants::ReadPointStatus, CommandError> {
-        let mut term_read_point_name = read_point_name.as_bytes().to_vec();
-        term_read_point_name.push(0); // Null terminator 
+    pub fn cmd_check_read_point_status(&mut self, read_point_name: &str)
+    -> Result<constants::ReadPointStatus, CommandError> {
         
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
@@ -817,7 +837,7 @@ impl Easy2ReadClient {
         )?;
         let avp_read_point_name = protocol::Avp::new(
             constants::AVP_READ_POINT_NAME, 
-            term_read_point_name,
+            Self::null_terminate(read_point_name),
         )?;
         let message = protocol::Message::new(
             self.message_id,
@@ -835,7 +855,9 @@ impl Easy2ReadClient {
             .find(|avp| avp.attr_type == constants::AVP_READ_POINT_STATUS)
             .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
         
-        let read_point_status = constants::ReadPointStatus::try_from(u32::from_be_bytes(result_avp.value[0..4].try_into().unwrap()))?;
+        let read_point_status = constants::ReadPointStatus::try_from(
+            u32::from_be_bytes(result_avp.value[0..4].try_into().unwrap()))?;
+        
         Ok(read_point_status)
     }
 
@@ -849,12 +871,8 @@ impl Easy2ReadClient {
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
     /// 
-    pub fn cmd_add_read_point_to_source(&mut self, source_name: &str, read_point_name: &str) -> Result<(), CommandError> {
-        let mut term_source_name = source_name.as_bytes().to_vec();
-        term_source_name.push(0); // Null terminator 
-
-        let mut term_read_point_name = read_point_name.as_bytes().to_vec();
-        term_read_point_name.push(0); // Null terminator 
+    pub fn cmd_add_read_point_to_source(&mut self, source_name: &str, read_point_name: &str)
+    -> Result<(), CommandError> {
 
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
@@ -862,11 +880,11 @@ impl Easy2ReadClient {
         )?;
         let avp_source_name = protocol::Avp::new(
             constants::AVP_SOURCE_NAME, 
-            term_source_name,
+            Self::null_terminate(source_name),
         )?;
         let avp_read_point_name = protocol::Avp::new(
             constants::AVP_READ_POINT_NAME, 
-            term_read_point_name,
+            Self::null_terminate(read_point_name),
         )?;
         let message = protocol::Message::new(
             self.message_id,
@@ -890,12 +908,8 @@ impl Easy2ReadClient {
     /// # Errors
     /// * `CommandError::Transport` - If a communication error occurs on the serial port
     /// * `CommandError::ReaderError` - If the reader returns a non-success result code
-    pub fn cmd_remove_read_point_from_source(&mut self, source_name: &str, read_point_name: &str) -> Result<(), CommandError> {
-        let mut term_source_name = source_name.as_bytes().to_vec();
-        term_source_name.push(0); // Null terminator 
-
-        let mut term_read_point_name = read_point_name.as_bytes().to_vec();
-        term_read_point_name.push(0); // Null terminator 
+    pub fn cmd_remove_read_point_from_source(&mut self, source_name: &str, read_point_name: &str)
+    -> Result<(), CommandError> {
 
         let avp_cmd_name = protocol::Avp::new(
             constants::AVP_COMMAND_NAME, 
@@ -903,11 +917,11 @@ impl Easy2ReadClient {
         )?;
         let avp_source_name = protocol::Avp::new(
             constants::AVP_SOURCE_NAME, 
-            term_source_name,
+            Self::null_terminate(source_name),
         )?;
         let avp_read_point_name = protocol::Avp::new(
             constants::AVP_READ_POINT_NAME, 
-            term_read_point_name,
+            Self::null_terminate(read_point_name),
         )?;
         let message = protocol::Message::new(
             self.message_id,
@@ -921,4 +935,159 @@ impl Easy2ReadClient {
         self.check_result_code(&response)?;
         Ok(())
     }
+
+    /// Reads data from a Gen2 tag memory bank.
+    ///
+    /// # Arguments
+    /// * `source_name` - Name of the source to use (e.g. "Source_0")
+    /// * `tag_id` - The ID of the tag to read
+    /// * `memory_bank` - The memory bank to read from
+    /// * `tag_address` - The address where to start reading
+    /// * `length` - Number of bytes to read (must be even)
+    /// * `password` - Optional EPC access password
+    ///
+    /// # Returns
+    /// A `Vec<u8>` containing the data read from the tag
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    /// * `CommandError::Message` - If the response does not contain the expected AVP
+    pub fn cmd_read_tag_data_epc_c1g2(
+        &mut self, 
+        source_name: &str, 
+        tag_id: &[u8], 
+        memory_bank: constants::MemoryBank, 
+        tag_address: u16, 
+        length: u16, 
+        passwd: Option<u32>
+    ) -> Result<Vec<u8>, CommandError> {
+        
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_READ_TAG_DATA_EPC_C1G2.to_be_bytes().to_vec(),
+        )?;
+        let avp_source_name = protocol::Avp::new(
+            constants::AVP_SOURCE_NAME, 
+            Self::null_terminate(source_name),
+        )?;
+        let avp_tag_id = protocol::Avp::new(
+            constants::AVP_TAG_ID, 
+            tag_id.to_vec(),
+        )?;
+        let avp_memory_bank = protocol::Avp::new(
+            constants::AVP_MEMORY_BANK, 
+            (memory_bank as u16).to_be_bytes().to_vec(),
+        )?;
+        let avp_tag_address = protocol::Avp::new(
+            constants::AVP_TAG_ADDRESS, 
+            (tag_address as u16).to_be_bytes().to_vec(),
+        )?;
+        let avp_length = protocol::Avp::new(
+            constants::AVP_LENGTH, 
+            (length as u16).to_be_bytes().to_vec(),
+        )?;
+
+        let mut avp_list = vec![
+            avp_cmd_name, avp_source_name, avp_tag_id, avp_memory_bank, avp_tag_address, avp_length
+            ];
+
+        if let Some(pwd) = passwd {
+            let avp_password = protocol::Avp::new(
+                constants::AVP_G2_PASSWORD, 
+                pwd.to_be_bytes().to_vec(),
+            )?;
+            avp_list.push(avp_password);
+        }
+
+        let message = protocol::Message::new(
+            self.message_id, 
+            avp_list
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+
+        // Find protocol avp in response
+        let result_avp = response.avp_list.iter()
+            .find(|avp| avp.attr_type == constants::AVP_TAG_VALUE)
+            .ok_or(CommandError::Message(protocol::MessageError::TooShort))?;
+
+        Ok(result_avp.value.clone())
+    }
+
+    /// Writes data to a Gen2 tag memory bank.
+    ///
+    /// # Arguments
+    /// * `source_name` - Name of the source to use (e.g. "Source_0")
+    /// * `tag_id` - The ID of the tag to write
+    /// * `memory_bank` - The memory bank to write to
+    /// * `tag_address` - The address where to start writing
+    /// * `data` - The data to write (must be even number of bytes)
+    /// * `passwd` - Optional EPC access password
+    ///
+    /// # Errors
+    /// * `CommandError::Transport` - If a communication error occurs on the serial port
+    /// * `CommandError::ReaderError` - If the reader returns a non-success result code
+    pub fn cmd_write_tag_data_epc_c1g2(
+        &mut self,
+        source_name: &str,
+        tag_id: &[u8],
+        memory_bank: constants::MemoryBank,
+        tag_address: u16,
+        data: &[u8],
+        passwd: Option<u32>,
+    ) -> Result<(), CommandError> {
+        let avp_cmd_name = protocol::Avp::new(
+            constants::AVP_COMMAND_NAME, 
+            constants::CMD_WRITE_TAG_DATA_EPC_C1G2.to_be_bytes().to_vec(),
+        )?;
+        let avp_source_name = protocol::Avp::new(
+            constants::AVP_SOURCE_NAME, 
+            Self::null_terminate(source_name),
+        )?;
+        let avp_tag_id = protocol::Avp::new(
+            constants::AVP_TAG_ID, 
+            tag_id.to_vec(),
+        )?;
+        let avp_memory_bank = protocol::Avp::new(
+            constants::AVP_MEMORY_BANK, 
+            (memory_bank as u16).to_be_bytes().to_vec(),
+        )?;
+        let avp_tag_address = protocol::Avp::new(
+            constants::AVP_TAG_ADDRESS, 
+            (tag_address as u16).to_be_bytes().to_vec(),
+        )?;
+        let avp_data = protocol::Avp::new(
+            constants::AVP_TAG_VALUE, 
+            data.to_vec(),
+        )?;
+
+        let mut avp_list = vec![
+            avp_cmd_name, avp_source_name, avp_tag_id, avp_memory_bank, avp_tag_address, avp_data
+            ];
+
+        if let Some(pwd) = passwd {
+            let avp_password = protocol::Avp::new(
+                constants::AVP_G2_PASSWORD, 
+                pwd.to_be_bytes().to_vec(),
+            )?;
+            avp_list.push(avp_password);
+        }
+
+        let message = protocol::Message::new(
+            self.message_id, 
+            avp_list
+        )?;
+
+        let bytes = Vec::<u8>::from(message);
+        self.transport.write_all(&bytes)?;
+        let response = self.receive_message()?;
+
+        self.check_result_code(&response)?;
+        Ok(())
+    } 
 }
